@@ -1,10 +1,11 @@
 const DRIVE_BASE = "https://www.googleapis.com/drive/v3";
 
-export async function listFiles(token: string, pageSize = 20) {
+export async function listFiles(token: string, pageSize = 20, query?: string) {
   const params = new URLSearchParams({
     pageSize: String(pageSize),
-    fields: "files(id,name,mimeType,modifiedTime,size)",
+    fields: "files(id,name,mimeType,modifiedTime,size,webViewLink)",
   });
+  if (query) params.set("q", query);
   const res = await fetch(`${DRIVE_BASE}/files?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });

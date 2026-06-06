@@ -2,7 +2,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { z } from "zod";
 import { listMessages, getMessage, sendMessage } from "../src/lib/gmail.js";
 import { listFiles, getFile } from "../src/lib/drive.js";
-import { chat } from "../src/lib/ollama.js";
+import { runChat } from "../src/lib/chat.js";
+import type { Message } from "../src/lib/ollama.js";
 
 const InvokeBody = z.object({
   jsonrpc: z.literal("2.0"),
@@ -41,25 +42,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let result: unknown;
 
     switch (capability) {
+      case "chat": {
+        const message = args.message as string;
+        const history = (args.history ?? []) as Message[];
+        if (!message) throw new Error("args.message is required");
+        result = await runChat(message, token, history);
+        break;
+      }
+
       case "gmail.list": {
-        const messages = await listMessages(token, (args.maxResults as number) ?? 20);
-        const summary = await chat(
-          "You are a helpful email assistant. Summarise the following email list concisely.",
-          JSON.stringify(messages)
-        );
-        result = { messages, summary };
+        result = await listMessages(token, (args.maxResults as number) ?? 20, args.query as string | undefined);
         break;
       }
 
       case "gmail.read": {
-        const messageId = args.id as string;
-        if (!messageId) throw new Error("args.id is required");
-        const message = await getMessage(token, messageId);
-        const summary = await chat(
-          "You are a helpful email assistant. Summarise this email clearly.",
-          JSON.stringify(message)
-        );
-        result = { message, summary };
+        if (!args.id) throw new Error("args.id is required");
+        result = await getMessage(token, args.id as string);
         break;
       }
 
@@ -71,19 +69,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case "drive.list": {
-        const files = await listFiles(token, (args.pageSize as number) ?? 20);
-        const summary = await chat(
-          "You are a helpful file assistant. Summarise the following Drive file list.",
-          JSON.stringify(files)
-        );
-        result = { files, summary };
+        result = await listFiles(token, (args.pageSize as number) ?? 20, args.query as string | undefined);
         break;
       }
 
       case "drive.read": {
-        const fileId = args.id as string;
-        if (!fileId) throw new Error("args.id is required");
-        result = await getFile(token, fileId);
+        if (!args.id) throw new Error("args.id is required");
+        result = await getFile(token, args.id as string);
         break;
       }
 

@@ -32,3 +32,8 @@ side_effects = []
 id = "drive.read"
 blast = "none"
 side_effects = []
+
+[[capabilities]]
+id = "chat"
+blast = "none"
+side_effects = []
