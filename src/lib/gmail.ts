@@ -1,12 +1,24 @@
 const GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 
-export async function listMessages(token: string, maxResults = 20) {
-  const res = await fetch(`${GMAIL_BASE}/messages?maxResults=${maxResults}`, {
+export async function listMessages(token: string, maxResults = 20, query?: string) {
+  const params = new URLSearchParams({ maxResults: String(maxResults) });
+  if (query) params.set("q", query);
+  const res = await fetch(`${GMAIL_BASE}/messages?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`Gmail list failed: ${res.status}`);
   const data = await res.json() as { messages: { id: string; threadId: string }[] };
-  return data.messages ?? [];
+  if (!data.messages?.length) return [];
+
+  const details = await Promise.all(
+    data.messages.slice(0, maxResults).map(async (m) => {
+      const msg = await getMessage(token, m.id);
+      const headers = (msg.payload?.headers ?? []) as { name: string; value: string }[];
+      const get = (name: string) => headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
+      return { id: m.id, threadId: m.threadId, from: get("From"), subject: get("Subject"), date: get("Date"), snippet: msg.snippet };
+    })
+  );
+  return details;
 }
 
 export async function getMessage(token: string, id: string) {
